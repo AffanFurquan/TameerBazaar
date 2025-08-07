@@ -4,6 +4,7 @@ import {
   products,
   favorites,
   inquiries,
+  sellerDetails,
   type User,
   type UpsertUser,
   type Category,
@@ -13,6 +14,8 @@ import {
   type InsertFavorite,
   type InsertInquiry,
   type Inquiry,
+  type InsertSellerDetails,
+  type SellerDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, ilike, and, or, sql } from "drizzle-orm";
@@ -52,6 +55,11 @@ export interface IStorage {
   // Inquiry operations
   createInquiry(inquiry: InsertInquiry): Promise<Inquiry>;
   getUserInquiries(userId: string, type: "sent" | "received"): Promise<Inquiry[]>;
+  
+  // Seller details operations
+  getSellerDetails(userId: string): Promise<SellerDetails | undefined>;
+  createSellerDetails(details: InsertSellerDetails): Promise<SellerDetails>;
+  updateSellerDetails(userId: string, details: Partial<InsertSellerDetails>): Promise<SellerDetails | undefined>;
   
   // Dashboard data
   getSellerStats(sellerId: string): Promise<{
@@ -512,6 +520,27 @@ export class DatabaseStorage implements IStorage {
       totalInquiries: Number(inquiryStats.total),
       recentInquiries: recentInquiries.slice(0, 5),
     };
+  }
+
+  // Seller details operations
+  async getSellerDetails(userId: string): Promise<SellerDetails | undefined> {
+    const [details] = await db.select().from(sellerDetails).where(eq(sellerDetails.userId, userId));
+    return details;
+  }
+
+  async createSellerDetails(details: InsertSellerDetails): Promise<SellerDetails> {
+    const [newDetails] = await db.insert(sellerDetails).values(details).returning();
+    return newDetails;
+  }
+
+  async updateSellerDetails(userId: string, details: Partial<InsertSellerDetails>): Promise<SellerDetails | undefined> {
+    const [updatedDetails] = await db
+      .update(sellerDetails)
+      .set({ ...details, updatedAt: new Date() })
+      .where(eq(sellerDetails.userId, userId))
+      .returning();
+    
+    return updatedDetails;
   }
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Navigation } from "@/components/Navigation";
 import { RoleSelector } from "@/components/RoleSelector";
+import { SellerOnboardingForm } from "@/components/SellerOnboardingForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useUser } from "@/contexts/UserContext";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { User, Building, Phone, MapPin, Globe } from "lucide-react";
 import { supportedLanguages } from "@/lib/i18n";
+import type { SellerDetails } from "@shared/schema";
 
 interface ProfileFormData {
   firstName: string;
@@ -32,6 +34,14 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showRoleSelector, setShowRoleSelector] = useState(false);
+  const [showSellerOnboarding, setShowSellerOnboarding] = useState(false);
+
+  // Query seller details if user is a seller or trying to become one
+  const { data: sellerDetails, isLoading: sellerDetailsLoading } = useQuery<SellerDetails | null>({
+    queryKey: ["/api/seller-details", user?.id],
+    enabled: !!user?.id && (user?.role === "seller" || formData.role === "seller"),
+    retry: false,
+  });
   
   const [formData, setFormData] = useState<ProfileFormData>({
     firstName: "",
@@ -127,9 +137,16 @@ export default function Profile() {
   };
 
   const handleRoleSelect = (role: "buyer" | "seller") => {
-    const updatedData = { ...formData, role };
-    setFormData(updatedData);
-    updateProfileMutation.mutate(updatedData);
+    setFormData(prev => ({ ...prev, role }));
+    
+    // If switching to seller, check if seller details exist
+    if (role === "seller") {
+      // The seller details query will be enabled and checked in the render logic
+      return;
+    }
+    
+    // For buyer role, update immediately
+    updateProfileMutation.mutate({ ...formData, role });
   };
 
   if (userLoading) {
@@ -147,6 +164,35 @@ export default function Profile() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Check if we need to show seller onboarding
+  useEffect(() => {
+    if (formData.role === "seller" && user?.role !== "seller" && !sellerDetailsLoading) {
+      if (!sellerDetails) {
+        setShowSellerOnboarding(true);
+      } else {
+        // Seller details exist, complete the role change
+        updateProfileMutation.mutate({ ...formData, role: "seller" });
+      }
+    }
+  }, [formData.role, user?.role, sellerDetails, sellerDetailsLoading]);
+
+  // Show seller onboarding form when switching to seller without details
+  if (showSellerOnboarding && user?.id) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <SellerOnboardingForm
+          userId={user.id}
+          onComplete={() => {
+            setShowSellerOnboarding(false);
+            // Complete the role change after seller details are created
+            updateProfileMutation.mutate({ ...formData, role: "seller" });
+          }}
+        />
       </div>
     );
   }

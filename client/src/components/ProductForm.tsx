@@ -49,7 +49,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
     categoryId: "",
     price: "",
     currency: "USD",
-    unit: "",
+    unit: "unit",
     imageUrl: "",
     tags: "",
     location: user?.location || "",
@@ -179,7 +179,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
   ];
 
   const unitOptions = [
-    { value: "", label: "Per unit" },
+    { value: "unit", label: "Per unit" },
     { value: "perBag", label: "Per bag" },
     { value: "perTon", label: "Per ton" },
     { value: "perSqM", label: "Per sq m" },

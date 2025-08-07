@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertProductSchema, insertInquirySchema, insertCategorySchema } from "@shared/schema";
+import { insertProductSchema, insertInquirySchema, insertCategorySchema, insertSellerDetailsSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -36,6 +36,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  // Seller details routes
+  app.get('/api/seller-details/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.params.userId;
+      const requestingUserId = req.user.claims.sub;
+      
+      // Users can only view their own seller details (for now)
+      if (userId !== requestingUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const sellerDetails = await storage.getSellerDetails(userId);
+      res.json(sellerDetails || null);
+    } catch (error) {
+      console.error("Error fetching seller details:", error);
+      res.status(500).json({ message: "Failed to fetch seller details" });
+    }
+  });
+
+  app.post('/api/seller-details', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const detailsData = insertSellerDetailsSchema.parse({
+        ...req.body,
+        userId: requestingUserId, // Ensure userId matches the authenticated user
+      });
+
+      const sellerDetails = await storage.createSellerDetails(detailsData);
+      res.status(201).json(sellerDetails);
+    } catch (error) {
+      console.error("Error creating seller details:", error);
+      res.status(500).json({ message: "Failed to create seller details" });
+    }
+  });
+
+  app.patch('/api/seller-details', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const updateData = req.body;
+
+      const updatedDetails = await storage.updateSellerDetails(requestingUserId, updateData);
+      if (!updatedDetails) {
+        return res.status(404).json({ message: "Seller details not found" });
+      }
+      
+      res.json(updatedDetails);
+    } catch (error) {
+      console.error("Error updating seller details:", error);
+      res.status(500).json({ message: "Failed to update seller details" });
     }
   });
 

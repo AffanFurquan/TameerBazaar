@@ -46,6 +46,31 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Seller business details
+export const sellerDetails = pgTable("seller_details", {
+  userId: varchar("user_id").primaryKey().references(() => users.id),
+  businessName: varchar("business_name", { length: 200 }).notNull(),
+  businessType: varchar("business_type", { 
+    enum: ["sole_proprietorship", "partnership", "corporation", "llc"] 
+  }).notNull(),
+  businessRegistrationNumber: varchar("business_registration_number"),
+  taxId: varchar("tax_id"),
+  bankName: varchar("bank_name", { length: 100 }).notNull(),
+  accountHolderName: varchar("account_holder_name", { length: 100 }).notNull(),
+  accountNumber: varchar("account_number", { length: 50 }).notNull(),
+  routingNumber: varchar("routing_number", { length: 20 }),
+  swiftCode: varchar("swift_code", { length: 11 }),
+  iban: varchar("iban", { length: 34 }),
+  businessAddress: text("business_address").notNull(),
+  businessPhone: varchar("business_phone", { length: 20 }).notNull(),
+  businessEmail: varchar("business_email").notNull(),
+  website: varchar("website"),
+  description: text("description"),
+  isVerified: boolean("is_verified").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Product categories
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -107,11 +132,19 @@ export const inquiries = pgTable("inquiries", {
 });
 
 // Relations
-export const userRelations = relations(users, ({ many }) => ({
+export const userRelations = relations(users, ({ one, many }) => ({
   products: many(products),
   favorites: many(favorites),
   inquiriesSent: many(inquiries, { relationName: "buyer" }),
   inquiriesReceived: many(inquiries, { relationName: "seller" }),
+  sellerDetails: one(sellerDetails),
+}));
+
+export const sellerDetailsRelations = relations(sellerDetails, ({ one }) => ({
+  user: one(users, {
+    fields: [sellerDetails.userId],
+    references: [users.id],
+  }),
 }));
 
 export const categoryRelations = relations(categories, ({ many }) => ({
@@ -186,6 +219,11 @@ export const insertInquirySchema = createInsertSchema(inquiries).omit({
   updatedAt: true,
 });
 
+export const insertSellerDetailsSchema = createInsertSchema(sellerDetails).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -205,3 +243,5 @@ export type Inquiry = typeof inquiries.$inferSelect & {
   seller?: User;
   product?: Product;
 };
+export type InsertSellerDetails = z.infer<typeof insertSellerDetailsSchema>;
+export type SellerDetails = typeof sellerDetails.$inferSelect;
